@@ -1,0 +1,1305 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Container,
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Paper,
+  CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Divider,
+  IconButton,
+  Chip,
+  List,
+  ListItem,
+  Menu,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  Snackbar,
+  Alert,
+  Tooltip,
+  Card,
+  CardContent,
+  Tabs,
+  Tab,
+  Pagination,
+  InputAdornment,
+  Badge,
+} from "@mui/material";
+import SendIcon from "@mui/icons-material/Send";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SaveIcon from "@mui/icons-material/Save";
+import SearchIcon from "@mui/icons-material/Search";
+import ArticleIcon from "@mui/icons-material/Article";
+import DescriptionIcon from "@mui/icons-material/Description";
+import SummarizeIcon from "@mui/icons-material/Summarize";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import ReactMarkdown from "react-markdown";
+import axios from "axios";
+import {
+  detectContentFormat,
+  formatContent,
+  suggestFilename,
+} from "./fileUtils";
+
+const API_URL = "http://127.0.0.1:11434/api";
+
+function App() {
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [documents, setDocuments] = useState([]);
+  const [activeDocument, setActiveDocument] = useState(null);
+  const [documentMode, setDocumentMode] = useState("auto");
+  const [documentTab, setDocumentTab] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedChunks, setSelectedChunks] = useState([]);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [currentChunkContent, setCurrentChunkContent] = useState("");
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const [fileGenDialogOpen, setFileGenDialogOpen] = useState(false);
+  const [fileContent, setFileContent] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [fileType, setFileType] = useState("txt");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const fileInputRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+function App() {
+  const [models, setModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [currentImage, setCurrentImage] = useState(null);
+  const [input, setInput] = useState("");
+  const [systemPrompt, setSystemPrompt] = useState("");
+  const [documents, setDocuments] = useState([]);
+  const [activeDocument, setActiveDocument] = useState(null);
+  const [documentMode, setDocumentMode] = useState("auto");
+  const [documentTab, setDocumentTab] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedChunks, setSelectedChunks] = useState([]);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [currentChunkContent, setCurrentChunkContent] = useState("");
+  const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+  const [menuAnchorEl, setMenuAnchorEl] = useState(null);
+  const [fileGenDialogOpen, setFileGenDialogOpen] = useState(false);
+  const [fileContent, setFileContent] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [fileType, setFileType] = useState("txt");
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const fileInputRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  // Fetch available models on component mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/tags`);
+        if (response.data && response.data.models) {
+          setModels(response.data.models);
+          // Set the first model as default if available
+          if (response.data.models.length > 0) {
+            setSelectedModel(response.data.models[0].name);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching models:", error);
+        showSnackbar(
+          "Failed to load models. Please ensure Ollama is running.",
+          "error"
+        );
+      }
+    };
+
+    fetchModels();
+  }, []);
+
+  // Auto-scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Fetch chunk content when current chunk changes
+  useEffect(() => {
+    if (activeDocument && currentChunk >= 0) {
+      const fetchChunk = async () => {
+        const chunkData = await handleFetchDocumentChunk(
+          activeDocument.id,
+          currentChunk
+        );
+        if (chunkData) {
+          setCurrentChunkContent(chunkData.content);
+        }
+      };
+
+      fetchChunk();
+    }
+  }, [activeDocument, currentChunk]);
+
+  const handleModelChange = (event) => {
+    setSelectedModel(event.target.value);
+  };
+
+  const handleDocumentTabChange = (event, newValue) => {
+    setDocumentTab(newValue);
+    // Reset search when changing tabs
+    if (newValue !== 2) {
+      setSearchQuery("");
+      setSearchResults([]);
+    }
+  };
+
+  const handleDocumentModeChange = (event) => {
+    setDocumentMode(event.target.value);
+  };
+
+  const showSnackbar = (message, severity) => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!isImageFile(file)) {
+      showSnackbar("Please upload a valid image file", "error");
+      return;
+    }
+
+    try {
+      const preview = await getImagePreview(file);
+      const imageResponse = await uploadImage(file);
+
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          role: "user",
+          content: "",
+          timestamp: new Date().toISOString(),
+          image: preview,
+        },
+      ]);
+
+      // Send the image URL to the API
+      const response = await axios.post(`${API_URL}/chat`, {
+        model: selectedModel,
+        messages: [
+          {
+            role: "user",
+            content: "",
+            image: imageResponse.url,
+          },
+        ],
+      });
+
+      if (response.data && response.data.response) {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            role: "assistant",
+            content: response.data.response,
+            timestamp: new Date().toISOString(),
+            image: null,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      showSnackbar("Failed to process image", "error");
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!input.trim() && !activeDocument) return;
+
+    // Add user message to chat
+    const userMessage = {
+      role: "user",
+      content: input,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      // Filter out system messages for display
+      const chatMessages = messages.filter((msg) => msg.role !== "system");
+
+      const requestData = {
+        model: selectedModel,
+        messages: chatMessages,
+        systemPrompt: systemPrompt,
+      };
+
+      if (activeDocument) {
+        requestData.documents = [activeDocument];
+      }
+
+      const response = await axios.post(`${API_URL}/chat`, requestData);
+
+      if (response.data && response.data.response) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: response.data.response,
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      showSnackbar("Failed to send message", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateFile = async () => {
+    if (!fileContent || !fileName) {
+      showSnackbar("Content and filename are required", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post(`${API_URL}/generate/file`, {
+        content: fileContent,
+        filename: fileName,
+        contentType: "text/plain",
+      });
+
+      if (response.data && response.data.downloadUrl) {
+        window.location.href = response.data.downloadUrl;
+        showSnackbar(`File "${fileName}" generated and downloaded`, "success");
+        handleCloseFileGenDialog();
+      }
+    } catch (error) {
+      console.error("Error generating file:", error);
+      showSnackbar("Failed to generate file", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseFileGenDialog = () => {
+    setFileGenDialogOpen(false);
+    setFileContent("");
+    setFileName("");
+  };
+
+  const handleQuickSaveMessage = async (content, isAssistant = false) => {
+    try {
+      const filename = suggestFilename(content, isAssistant ? "assistant" : "user");
+      
+      const response = await axios.post(`${API_URL}/generate/file`, {
+        content,
+        filename,
+        contentType: detectContentFormat(content),
+      });
+
+      if (response.data && response.data.downloadUrl) {
+        window.location.href = response.data.downloadUrl;
+        showSnackbar(`Message saved and downloaded as ${filename}`, "success");
+      }
+    } catch (error) {
+      console.error("Error saving message:", error);
+      showSnackbar("Failed to save message", "error");
+    }
+  };
+
+  const Message = ({ role, content, timestamp, image }) => {
+    return (
+      <Box>
+        <Paper
+          elevation={1}
+          sx={{
+            p: 2,
+            bgcolor: role === "user" ? "primary.light" : "background.paper",
+            color: role === "user" ? "primary.contrastText" : "text.primary",
+            position: "relative",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 0.5,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              {role === "user" ? "You" : "Assistant"}
+            </Typography>
+            <Tooltip title="Save message to file">
+              <IconButton
+                size="small"
+                onClick={() => handleQuickSaveMessage(content, role === "assistant")}
+              >
+                <SaveIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          {image ? (
+            <Box sx={{ maxWidth: '100%', maxHeight: '300px', overflow: 'hidden' }}>
+              <img 
+                src={image} 
+                alt="Uploaded image" 
+                style={{ maxWidth: '100%', height: 'auto', objectFit: 'contain' }}
+              />
+            </Box>
+          ) : (
+            <ReactMarkdown>{content}</ReactMarkdown>
+          )}
+        </Paper>
+      </Box>
+    );
+  };
+
+  const renderUI = () => {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2 }}>
+        {/* Document explorer panel */}
+        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, mb: 2 }}>
+          {activeDocument && (
+            <Paper
+              elevation={3}
+              sx={{
+                flexGrow: 2,
+                display: "flex",
+                flexDirection: "column",
+                maxWidth: "350px",
+              }}
+            >
+              {renderDocumentExplorer()}
+            </Paper>
+          )}
+        </Box>
+
+        {/* Document chips and file upload */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Documents:
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {documents.map((doc, index) => (
+              <Chip
+                key={doc.id}
+                label={`${doc.name} (${doc.chunkCount} chunks)`}
+                onClick={() => handleSetActiveDocument(doc)}
+                onDelete={() => handleRemoveDocument(index)}
+                variant={activeDocument?.id === doc.id ? "filled" : "outlined"}
+                sx={{
+                  maxWidth: "200px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              />
+            ))}
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<UploadFile />}
+              onClick={() => fileInputRef.current.click()}
+              sx={{
+                height: "fit-content",
+                mt: 1,
+              }}
+            >
+              Upload Document
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              hidden
+              onChange={handleFileUpload}
+              accept=".pdf,.doc,.docx,.txt"
+            />
+          </Box>
+        </Box>
+
+        {/* Chat messages */}
+        <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+          {messages.map((message, index) => (
+            <Message
+              key={index}
+              role={message.role}
+              content={message.content}
+              timestamp={message.timestamp}
+              image={message.image}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </Box>
+
+        {/* Message input */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <TextField
+            fullWidth
+            multiline
+            maxRows={4}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            onKeyDown={(e) => e.key === 'Enter' && e.shiftKey ? handleSendMessage() : null}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton onClick={handleSendMessage} disabled={loading}>
+                    {loading ? <CircularProgress size={20} /> : <Send />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Box>
+
+        {/* File generation dialog */}
+        <Dialog open={fileGenDialogOpen} onClose={() => setFileGenDialogOpen(false)}>
+          <DialogTitle>Generate File</DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              label="File Name"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              margin="normal"
+            />
+            <FormControl fullWidth margin="normal">
+              <InputLabel>File Type</InputLabel>
+              <Select
+                value={fileType}
+                onChange={(e) => setFileType(e.target.value)}
+                label="File Type"
+              >
+                <MenuItem value="txt">Text File (.txt)</MenuItem>
+                <MenuItem value="md">Markdown File (.md)</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              multiline
+              rows={4}
+              label="File Content"
+              value={fileContent}
+              onChange={(e) => setFileContent(e.target.value)}
+              margin="normal"
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setFileGenDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleGenerateFile} variant="contained">
+              Generate
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Snackbar for notifications */}
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={handleCloseSnackbar}
+            severity={snackbarSeverity}
+            sx={{ width: '100%' }}
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+      </Box>
+    );
+  };
+
+  return renderUI();
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!isImageFile(file)) {
+      showSnackbar("Please upload a valid image file", "error");
+      return;
+    }
+
+    try {
+      const preview = await getImagePreview(file);
+      const imageResponse = await uploadImage(file);
+
+      setMessages((prevMessages) => [
+        ...prevMessages,
+        {
+          role: "user",
+          content: "",
+          timestamp: new Date().toISOString(),
+          image: preview,
+        },
+      ]);
+
+      // Send the image URL to the API
+      const response = await axios.post(`${API_URL}/chat`, {
+        model: selectedModel,
+        messages: [
+          {
+            role: "user",
+            content: "",
+            image: imageResponse.url,
+          },
+        ],
+      });
+
+      if (response.data && response.data.response) {
+        setMessages((prevMessages) => [
+          ...prevMessages,
+          {
+            role: "assistant",
+            content: response.data.response,
+            timestamp: new Date().toISOString(),
+            image: null,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error processing image:", error);
+      showSnackbar("Failed to process image", "error");
+    }
+  };
+
+
+
+  const handleSendMessage = async () => {
+    if (!input.trim() && !activeDocument) return;
+
+    // Add user message to chat
+    const userMessage = {
+      role: "user",
+      content: input,
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      // Filter out system messages for display
+      const chatMessages = messages.filter((msg) => msg.role !== "system");
+
+      const requestData = {
+        model: selectedModel,
+        messages: [...chatMessages, userMessage],
+        systemPrompt: systemPrompt || undefined,
+      };
+
+      // Add document processing mode if a document is active
+      if (activeDocument) {
+        requestData.documentId = activeDocument.id;
+        requestData.mode = documentMode;
+
+        // Add specific chunk indices if in 'specific_chunks' mode
+        if (documentMode === "specific_chunks" && selectedChunks.length > 0) {
+          requestData.chunkIndices = selectedChunks;
+        }
+
+        // Add search query if in 'search' mode
+        if (documentMode === "search" && searchQuery) {
+          requestData.searchQuery = searchQuery;
+        }
+      }
+
+      const response = await axios.post(`${API_URL}/chat`, requestData);
+
+      if (response.data && response.data.message) {
+        setMessages((prev) => [...prev, response.data.message]);
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Sorry, I encountered an error processing your request. Please try again.",
+        },
+      ]);
+      showSnackbar("Error communicating with the LLM", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("document", file);
+
+    setLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (response.data) {
+        // Add document to list
+        const newDoc = response.data;
+        setDocuments((prev) => [...prev, newDoc]);
+
+        // Set as active document
+        setActiveDocument(newDoc);
+
+        // Default to 'auto' mode for new documents
+        setDocumentMode("auto");
+
+        // Reset document viewing state
+        setCurrentChunk(0);
+        setSelectedChunks([0]);
+        setDocumentTab(0);
+
+        // Show notification
+        showSnackbar(
+          `Document "${newDoc.filename}" uploaded successfully`,
+          "success"
+        );
+
+        // Let the user know about large documents
+        if (newDoc.chunkCount > 5) {
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: `I've loaded "${newDoc.filename}" (${newDoc.pageEstimate} pages). This is a large document with ${newDoc.chunkCount} sections. I'll analyze parts of it as you ask questions, or you can use the Document tab to navigate specific sections.`,
+            },
+          ]);
+        }
+      }
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      showSnackbar("Failed to upload document", "error");
+    } finally {
+      setLoading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleFetchDocumentChunk = async (docId, chunkIndex) => {
+    try {
+      setLoading(true);
+      const response = await axios.get(
+        `${API_URL}/document/${docId}/chunk/${chunkIndex}`
+      );
+      setLoading(false);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching document chunk:", error);
+      showSnackbar("Failed to fetch document chunk", "error");
+      setLoading(false);
+      return null;
+    }
+  };
+
+  const handleSearchDocument = async () => {
+    if (!activeDocument || !searchQuery.trim()) return;
+
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        `${API_URL}/document/${activeDocument.id}/search`,
+        {
+          query: searchQuery,
+        }
+      );
+
+      setSearchResults(response.data.results);
+
+      if (response.data.results.length === 0) {
+        showSnackbar("No matches found", "info");
+      } else {
+        // Select the chunks with matches for processing
+        const matchedChunks = response.data.results.map((r) => r.chunkIndex);
+        setSelectedChunks(matchedChunks);
+
+        // Show the first matching chunk
+        if (matchedChunks.length > 0) {
+          setCurrentChunk(matchedChunks[0]);
+        }
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error searching document:", error);
+      showSnackbar("Failed to search document", "error");
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveDocument = (index) => {
+    const docToRemove = documents[index];
+
+    // Remove from documents list
+    setDocuments((prev) => prev.filter((_, i) => i !== index));
+
+    // Clear active document if it was the one removed
+    if (activeDocument && activeDocument.id === docToRemove.id) {
+      setActiveDocument(null);
+    }
+  };
+
+  const handleSetActiveDocument = (doc) => {
+    setActiveDocument(doc);
+    setCurrentChunk(0);
+    setSelectedChunks([0]);
+  };
+
+  const handleGenerateFile = async () => {
+    if (!fileContent || !fileName) {
+      showSnackbar("Content and filename are required", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post(`${API_URL}/generate/file`, {
+        content: fileContent,
+        filename: fileName,
+        contentType: "text/plain",
+      });
+
+      if (response.data && response.data.downloadUrl) {
+        window.location.href = response.data.downloadUrl;
+        showSnackbar(`File "${fileName}" generated and downloaded`, "success");
+        handleCloseFileGenDialog();
+      }
+    } catch (error) {
+      console.error("Error generating file:", error);
+      showSnackbar("Failed to generate file", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+const handleOpenFileGenDialog = () => {
+  handleMenuClose();
+  setFileGenDialogOpen(true);
+};
+
+
+
+const handleQuickSaveMessage = async (content, isAssistant = false) => {
+  try {
+    setLoading(true);
+    const timestamp = Date.now();
+    const prefix = isAssistant ? "assistant" : "user";
+    const fileName = `${prefix}_message_${timestamp}.txt`;
+
+    const response = await axios.post(`${API_URL}/generate/file`, {
+      content,
+      filename: fileName,
+      contentType: "text/plain",
+    });
+
+    if (response.data && response.data.downloadUrl) {
+      window.location.href = response.data.downloadUrl;
+      showSnackbar(`Message saved and downloaded as ${fileName}`, "success");
+    }
+  } catch (error) {
+    console.error("Error saving message:", error);
+    showSnackbar("Failed to save message", "error");
+  }
+};
+
+const Message = ({ role, content, timestamp, image }) => {
+  return (
+    <Box>
+      <Paper
+        elevation={1}
+        sx={{
+          p: 2,
+          bgcolor: role === "user" ? "primary.light" : "background.paper",
+          color: role === "user" ? "primary.contrastText" : "text.primary",
+          position: "relative",
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 0.5,
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {role === "user" ? "You" : "Assistant"}
+          </Typography>
+          <Tooltip title="Save message to file">
+            <IconButton
+              size="small"
+              onClick={() => handleQuickSaveMessage(content, role === "assistant")}
+            >
+              <SaveIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        {image ? (
+          <Box sx={{ maxWidth: '100%', maxHeight: '300px', overflow: 'hidden' }}>
+            <img 
+              src={image} 
+              alt="Uploaded image" 
+              style={{ maxWidth: '100%', height: 'auto', objectFit: 'contain' }}
+            />
+          </Box>
+        ) : (
+          <ReactMarkdown>{content}</ReactMarkdown>
+        )}
+      </Paper>
+    </Box>
+  );
+};      };
+
+    setMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      showSnackbar('Failed to send message', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post(`${API_URL}/upload/image`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const message = {
+        role: "user",
+        content: "",
+        timestamp: Date.now(),
+        image: response.data.imageUrl,
+      };
+
+      setMessages(prev => [...prev, message]);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      showSnackbar('Failed to upload image', 'error');
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post(`${API_URL}/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const doc = {
+        id: response.data.id,
+        filename: file.name,
+        chunkCount: response.data.chunkCount,
+      };
+
+      setDocuments(prev => [...prev, doc]);
+      setActiveDocument(doc);
+      showSnackbar(`Document "${file.name}" uploaded successfully`, 'success');
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      showSnackbar('Failed to upload file', 'error');
+    }
+  };
+
+  const handleRemoveDocument = (index) => {
+    const newDocuments = [...documents];
+    const removedDoc = newDocuments.splice(index, 1)[0];
+    setDocuments(newDocuments);
+
+    if (activeDocument?.id === removedDoc.id) {
+      setActiveDocument(null);
+    }
+
+    showSnackbar(`Document "${removedDoc.filename}" removed`, 'info');
+  };
+
+  const handleSetActiveDocument = (doc) => {
+    setActiveDocument(doc);
+    setInput('');
+  };
+
+  const showSnackbar = (message, severity = 'info') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+
+  const handleGenerateFile = async () => {
+    if (!fileContent || !fileName) {
+      showSnackbar("Content and filename are required", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post(`${API_URL}/generate/file`, {
+        content: fileContent,
+        filename: fileName,
+        contentType: "text/plain",
+      });
+
+      if (response.data && response.data.downloadUrl) {
+        window.location.href = response.data.downloadUrl;
+        showSnackbar(`File "${fileName}" generated and downloaded`, "success");
+        handleCloseFileGenDialog();
+      }
+    } catch (error) {
+      console.error("Error generating file:", error);
+      showSnackbar("Failed to generate file", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseFileGenDialog = () => {
+    setFileGenDialogOpen(false);
+    setFileContent('');
+    setFileName('');
+    setFileType('txt');
+  };
+
+  const handleQuickSaveMessage = async (content, isAssistant = false) => {
+    try {
+      setLoading(true);
+      const timestamp = Date.now();
+      const prefix = isAssistant ? "assistant" : "user";
+      const fileName = `${prefix}_message_${timestamp}.txt`;
+
+      const response = await axios.post(`${API_URL}/generate/file`, {
+        content,
+        filename: fileName,
+        contentType: "text/plain",
+      });
+
+      if (response.data && response.data.downloadUrl) {
+        window.location.href = response.data.downloadUrl;
+        showSnackbar(`Message saved and downloaded as ${fileName}`, "success");
+      }
+    } catch (error) {
+      console.error("Error saving message:", error);
+      showSnackbar("Failed to save message", "error");
+    }
+  };
+
+  const renderDocumentExplorer = () => {
+    if (!activeDocument) return null;
+
+    return (
+      <Box sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          {activeDocument.filename}
+        </Typography>
+        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+          {activeDocument.chunkCount} chunks
+        </Typography>
+        <Divider sx={{ my: 2 }} />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {Array.from({ length: activeDocument.chunkCount }, (_, index) => (
+            <Button
+              key={index}
+              variant="outlined"
+              fullWidth
+              onClick={() => handleDocumentTabChange(index)}
+            >
+              Chunk {index + 1}
+            </Button>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
+  const Message = ({ role, content, timestamp, image }) => {
+    return (
+      <Box>
+        <Paper
+          elevation={1}
+          sx={{
+            p: 2,
+            bgcolor: role === "user" ? "primary.light" : "background.paper",
+            color: role === "user" ? "primary.contrastText" : "text.primary",
+            position: "relative",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 0.5,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              {role === "user" ? "You" : "Assistant"}
+            </Typography>
+            <Tooltip title="Save message to file">
+              <IconButton
+                size="small"
+                onClick={() => handleQuickSaveMessage(content, role === "assistant")}
+              >
+                <Save fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          {image ? (
+            <Box sx={{ maxWidth: '100%', maxHeight: '300px', overflow: 'hidden' }}>
+              <img 
+                src={image} 
+                alt="Uploaded image" 
+                style={{ maxWidth: '100%', height: 'auto', objectFit: 'contain' }}
+              />
+            </Box>
+          ) : (
+            <ReactMarkdown>{content}</ReactMarkdown>
+          )}
+        </Paper>
+      </Box>
+    );
+  };
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 2, height: '100vh' }}>
+      {/* Document explorer panel */}
+      <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, mb: 2 }}>
+        {activeDocument && (
+          <Paper
+            elevation={3}
+            sx={{
+              flexGrow: 2,
+              display: "flex",
+              flexDirection: "column",
+              maxWidth: "350px",
+              height: 'calc(100vh - 100px)',
+            }}
+          >
+            {renderDocumentExplorer()}
+          </Paper>
+        )}
+        {/* Document chips and file upload */}
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Documents:
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {documents.map((doc, index) => (
+              <Chip
+                key={index}
+                label={doc.filename}
+                variant={activeDocument && activeDocument.id === doc.id ? "filled" : "outlined"}
+                color={activeDocument && activeDocument.id === doc.id ? "primary" : "default"}
+                onClick={() => handleSetActiveDocument(doc)}
+                onDelete={() => handleRemoveDocument(index)}
+                deleteIcon={<Delete />}
+                avatar={
+                  <Badge badgeContent={doc.chunkCount} color="secondary">
+                    <Description />
+                  </Badge>
+                }
+              />
+            ))}
+            <Button
+              component="label"
+              variant="outlined"
+              startIcon={<UploadFile />}
+              size="small"
+            >
+              Upload
+              <input
+                ref={fileInputRef}
+                type="file"
+                hidden
+                accept=".pdf,.docx,.doc,.txt"
+                onChange={handleFileUpload}
+                disabled={loading}
+              />
+            </Button>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Input area */}
+      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+        <input
+          accept="image/*"
+          style={{ display: 'none' }}
+          id="raised-button-file"
+          type="file"
+          onChange={handleImageUpload}
+        />
+        <label htmlFor="raised-button-file">
+          <Button
+            variant="outlined"
+            startIcon={<UploadFile />}
+            component="span"
+          >
+            Upload Image
+          </Button>
+        </label>
+        <TextField
+          fullWidth
+          multiline
+          rows={4}
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Type your message..."
+          variant="outlined"
+          InputProps={{
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton
+                  color="primary"
+                  onClick={handleSendMessage}
+                  disabled={loading || !input.trim() && !activeDocument}
+                >
+                  <Send />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+
+      {/* Chat messages */}
+      <Box sx={{ flexGrow: 1, mb: 2, overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+        <Paper sx={{ p: 2 }}>
+          {loading && (
+            <Box sx={{ display: "flex", justifyContent: "center", my: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+          {messages.map((message, index) => (
+            <Message
+              key={index}
+              role={message.role}
+              content={message.content}
+              timestamp={message.timestamp}
+              image={message.image}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </Paper>
+      </Box>
+
+      {/* File generation dialog */}
+      <Dialog open={fileGenDialogOpen} onClose={handleCloseFileGenDialog}>
+        <DialogTitle>Generate File</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Content"
+            fullWidth
+            multiline
+            rows={4}
+            value={fileContent}
+            onChange={(e) => setFileContent(e.target.value)}
+          />
+          <TextField
+            margin="dense"
+            label="Filename"
+            fullWidth
+            value={fileName}
+            onChange={(e) => setFileName(e.target.value)}
+          />
+          <FormControl fullWidth margin="dense">
+            <InputLabel>File Type</InputLabel>
+            <Select
+              value={fileType}
+              onChange={(e) => setFileType(e.target.value)}
+            >
+              <MenuItem value="txt">Text (.txt)</MenuItem>
+              <MenuItem value="md">Markdown (.md)</MenuItem>
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseFileGenDialog}>Cancel</Button>
+          <Button onClick={handleGenerateFile} variant="contained">
+            Generate
+            startIcon={<DownloadIcon />}
+            disabled={!fileContent || !fileName}
+          >
+            Generate & Download
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbarSeverity}
+          sx={{ width: "100%" }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
+    </Container>
+  );
+}
+
+export default App;

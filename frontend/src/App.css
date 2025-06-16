@@ -1,0 +1,70 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background: linear-gradient(135deg, #E91E63 0%, #FF69B4 100%);
+  padding: 20px;
+  color: white;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  box-shadow: 0 4px 20px rgba(233, 30, 99, 0.3);
+}
+
+.App-link {
+  color: #FFB3E6;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.App-link:hover {
+  color: #FFFFFF;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #D4B896;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(45deg, #E91E63, #FF69B4);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(45deg, #AD1457, #C2185B);
+}
+
+/* Body background */
+body {
+  background: linear-gradient(135deg, #D4B896 0%, #C4A373 100%);
+  min-height: 100vh;
+}
